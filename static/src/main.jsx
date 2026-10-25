@@ -1861,7 +1861,7 @@ function initKeyboardShortcuts() {
 		}
 		if (e.keyCode === 27) {
 			$(".custom-modal-overlay .close.icon").click();
-			$("#api-keys-modal").fadeOut(150);
+			$("#api-keys-modal, #exit-app-modal").fadeOut(150);
 		}
 	});
 }
@@ -1957,8 +1957,62 @@ function initApiKeysModal() {
 	});
 }
 
+function renderAppStopped() {
+	var stoppedHtml = 
+		'<div class="app-stopped-container">' +
+			'<div class="app-stopped-card">' +
+				'<div class="app-stopped-icon">' +
+					'<i class="power off icon"></i>' +
+				'</div>' +
+				'<h2 style="font-weight: 700; margin-bottom: 8px; color: var(--color-text-main);">Git Modifier Stopped</h2>' +
+				'<p style="color: var(--color-text-muted); font-size: 0.9375rem; margin-bottom: 24px; line-height: 1.6;">' +
+					'The background server process has been cleanly shut down.<br>' +
+					'You can now close this tab, or restart the app anytime by running <code>/rewrite</code> in your terminal.' +
+				'</p>' +
+				'<button type="button" class="zero-btn-primary" id="btn-close-tab" style="padding: 10px 20px; font-size: 0.875rem;">' +
+					'<i class="times icon"></i> Close Browser Tab' +
+				'</button>' +
+			'</div>' +
+		'</div>';
+
+	$("body").html(stoppedHtml);
+	$("#btn-close-tab").on("click", function () {
+		window.close();
+		$(this).text("Tab can now be closed manually");
+	});
+}
+
+function initExitModal() {
+	$("#exit-app-btn").on("click", function () {
+		$("#exit-app-modal").fadeIn(200);
+	});
+
+	$("#exit-modal-close-btn, #exit-modal-cancel-btn").on("click", function () {
+		$("#exit-app-modal").fadeOut(150);
+	});
+
+	$("#exit-app-modal").on("click", function (e) {
+		if ($(e.target).is("#exit-app-modal")) {
+			$("#exit-app-modal").fadeOut(150);
+		}
+	});
+
+	$("#exit-modal-confirm-btn").on("click", function () {
+		var $btn = $(this);
+		$btn.addClass("loading disabled");
+		$("#exit-modal-cancel-btn").addClass("disabled");
+
+		$.post("/shutdown")
+			.always(function () {
+				$("#exit-app-modal").fadeOut(100);
+				renderAppStopped();
+			});
+	});
+}
+
 $(document).ready(function () {
 	initApiKeysModal();
+	initExitModal();
 
 	// Check URL query parameters (e.g. from /rewrite CLI tool)
 	var urlParams = new URLSearchParams(window.location.search);

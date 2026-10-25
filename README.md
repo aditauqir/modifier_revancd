@@ -40,6 +40,9 @@
 - **Smart `/rewrite` CLI & Zsh Integration**:
   - Run `/rewrite` from any folder in your terminal.
   - Automatically checks if your current working directory is inside a Git repository. If yes, it auto-detects the repository root and active branch and launches the visualizer. If not, it falls back to the default repository.
+- **In-Browser Exit & Server Shutdown**:
+  - One-click Exit button in the top navigation header.
+  - Confirms and safely shuts down the background Python server process, cleanly releasing port 5000 and displaying a session termination screen.
 
 ---
 

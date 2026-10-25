@@ -539,5 +539,21 @@ def llm_generate_commits():
         })
 
 
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    """Shuts down the Flask server background process cleanly."""
+    def kill_process():
+        import signal
+        time.sleep(0.5)
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    import threading
+    threading.Thread(target=kill_process, daemon=True).start()
+    return jsonify({
+        "success": True,
+        "message": "Git Modifier server is shutting down..."
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True)

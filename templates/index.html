@@ -32,6 +32,10 @@
 					<span id="api-keys-label">API Keys</span>
 					<span class="key-status-dot" id="api-keys-dot"></span>
 				</button>
+				<button class="exit-popout-btn" id="exit-app-btn" type="button" title="Exit app and shut down server">
+					<i class="power off icon" style="margin-right: 2px;"></i>
+					<span>Exit</span>
+				</button>
 			</div>
 		</header>
 
@@ -146,6 +150,32 @@
 						</button>
 					</div>
 				</form>
+			</div>
+		</div>
+
+		<!-- Exit App Confirmation Modal -->
+		<div class="custom-modal-overlay" id="exit-app-modal" style="display: none;">
+			<div class="custom-modal-card" style="max-width: 440px;">
+				<div class="custom-modal-header">
+					<h3><i class="power off icon" style="color: var(--color-red, #EF4444);"></i> Exit Git Repo Modifier</h3>
+					<i class="close icon link" id="exit-modal-close-btn"></i>
+				</div>
+				<div class="custom-modal-body" style="padding: 1rem 0;">
+					<p style="font-size: 0.875rem; margin-bottom: 8px; color: var(--color-text-main);">
+						Are you sure you want to exit and shut down the app?
+					</p>
+					<p style="font-size: 0.8125rem; color: var(--color-text-muted); margin: 0;">
+						This will terminate the background Flask server. You can relaunch it at any time by running <code>/rewrite</code> in your terminal.
+					</p>
+				</div>
+				<div class="custom-modal-actions">
+					<button type="button" class="zero-btn-secondary" id="exit-modal-cancel-btn">
+						Cancel
+					</button>
+					<button type="button" class="zero-btn-primary" id="exit-modal-confirm-btn" style="background: var(--color-red, #EF4444); border-color: var(--color-red, #EF4444);">
+						<i class="power off icon"></i> Shut Down & Exit
+					</button>
+				</div>
 			</div>
 		</div>
 
