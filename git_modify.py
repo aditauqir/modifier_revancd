@@ -335,6 +335,149 @@ fi
         self.repo.git.checkout(branch_name)
         return branch_name
 
+    def delete_commit(self, target_sha, target_direction="prev", branch=None):
+        """
+        Delete a commit from history and merge/latch its diff into the next or previous commit.
+        All file changes and modifications are preserved.
+        """
+        if not self.repo:
+            raise git.InvalidGitRepositoryError
+
+        if not branch:
+            try:
+                branch = self.repo.active_branch.name
+            except Exception:
+                branch = "HEAD"
+
+        # Check for unstaged changes and auto-stash
+        stashed = False
+        if self.repo.is_dirty(untracked_files=True):
+            try:
+                self.repo.git.stash("push", "-u", "-m", "git_modifier_autostash")
+                stashed = True
+            except Exception:
+                pass
+
+        try:
+            commits = list(reversed(list(self.repo.iter_commits(branch))))
+            if not commits:
+                raise ValueError("No commits found in branch.")
+
+            target_idx = None
+            for idx, c in enumerate(commits):
+                if c.hexsha == target_sha or c.hexsha.startswith(target_sha):
+                    target_idx = idx
+                    break
+
+            if target_idx is None:
+                raise ValueError(f"Commit '{target_sha}' not found in revision history.")
+
+            # Adjust direction at boundaries
+            if target_direction == "prev" and target_idx == 0:
+                if len(commits) == 1:
+                    raise ValueError("Cannot delete the only commit in repository.")
+                target_direction = "next"
+            elif target_direction == "next" and target_idx == len(commits) - 1:
+                if len(commits) == 1:
+                    raise ValueError("Cannot delete the only commit in repository.")
+                target_direction = "prev"
+
+            last_parent = None
+            absorbed_into = None
+
+            if target_direction == "next":
+                for idx in range(target_idx):
+                    last_parent = commits[idx].hexsha
+
+                target_c = commits[target_idx]
+                next_c = commits[target_idx + 1]
+                absorbed_into = next_c.hexsha[:7]
+
+                msg = f"{next_c.message.strip()}\n\n[Merged commit {target_c.hexsha[:7]}: {target_c.message.strip().splitlines()[0]}]"
+                env = {
+                    "GIT_AUTHOR_NAME": next_c.author.name,
+                    "GIT_AUTHOR_EMAIL": next_c.author.email,
+                    "GIT_AUTHOR_DATE": str(next_c.authored_date),
+                    "GIT_COMMITTER_NAME": next_c.committer.name,
+                    "GIT_COMMITTER_EMAIL": next_c.committer.email,
+                    "GIT_COMMITTER_DATE": str(next_c.committed_date),
+                }
+                args = [next_c.tree.hexsha, "-m", msg]
+                if last_parent:
+                    args.extend(["-p", last_parent])
+                new_next = self.repo.git.commit_tree(*args, env=env)
+                last_parent = new_next
+
+                for idx in range(target_idx + 2, len(commits)):
+                    c = commits[idx]
+                    env = {
+                        "GIT_AUTHOR_NAME": c.author.name,
+                        "GIT_AUTHOR_EMAIL": c.author.email,
+                        "GIT_AUTHOR_DATE": str(c.authored_date),
+                        "GIT_COMMITTER_NAME": c.committer.name,
+                        "GIT_COMMITTER_EMAIL": c.committer.email,
+                        "GIT_COMMITTER_DATE": str(c.committed_date),
+                    }
+                    args = [c.tree.hexsha, "-p", last_parent, "-m", c.message.strip()]
+                    last_parent = self.repo.git.commit_tree(*args, env=env)
+
+            else:  # target_direction == "prev"
+                for idx in range(target_idx - 1):
+                    last_parent = commits[idx].hexsha
+
+                prev_c = commits[target_idx - 1]
+                target_c = commits[target_idx]
+                absorbed_into = prev_c.hexsha[:7]
+
+                msg = f"{prev_c.message.strip()}\n\n[Merged commit {target_c.hexsha[:7]}: {target_c.message.strip().splitlines()[0]}]"
+                env = {
+                    "GIT_AUTHOR_NAME": prev_c.author.name,
+                    "GIT_AUTHOR_EMAIL": prev_c.author.email,
+                    "GIT_AUTHOR_DATE": str(prev_c.authored_date),
+                    "GIT_COMMITTER_NAME": prev_c.committer.name,
+                    "GIT_COMMITTER_EMAIL": prev_c.committer.email,
+                    "GIT_COMMITTER_DATE": str(prev_c.committed_date),
+                }
+                args = [target_c.tree.hexsha, "-m", msg]
+                if last_parent:
+                    args.extend(["-p", last_parent])
+                new_prev = self.repo.git.commit_tree(*args, env=env)
+                last_parent = new_prev
+
+                for idx in range(target_idx + 1, len(commits)):
+                    c = commits[idx]
+                    env = {
+                        "GIT_AUTHOR_NAME": c.author.name,
+                        "GIT_AUTHOR_EMAIL": c.author.email,
+                        "GIT_AUTHOR_DATE": str(c.authored_date),
+                        "GIT_COMMITTER_NAME": c.committer.name,
+                        "GIT_COMMITTER_EMAIL": c.committer.email,
+                        "GIT_COMMITTER_DATE": str(c.committed_date),
+                    }
+                    args = [c.tree.hexsha, "-p", last_parent, "-m", c.message.strip()]
+                    last_parent = self.repo.git.commit_tree(*args, env=env)
+
+            if branch != "HEAD":
+                self.repo.git.update_ref(f"refs/heads/{branch}", last_parent)
+            else:
+                self.repo.git.update_ref("HEAD", last_parent)
+
+            self.repo.head.reset(index=True, working_tree=True)
+
+            return {
+                "success": True,
+                "deleted_sha": target_sha,
+                "absorbed_into": absorbed_into,
+                "direction": target_direction,
+                "new_head": last_parent
+            }
+        finally:
+            if stashed:
+                try:
+                    self.repo.git.stash("pop")
+                except Exception:
+                    pass
+
     def get_origin_info(self):
         """
         Get remote origin URL and check if repository is tied to an origin.

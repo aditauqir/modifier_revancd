@@ -274,6 +274,51 @@ def switch_branch():
         return jsonify({"success": False, "error": str(e)})
 
 
+@app.route("/delete_commit", methods=["POST"])
+def delete_commit():
+    address = request.form.get("address", session.get("address", "")).strip()
+    sha = request.form.get("sha", "").strip()
+    target_direction = request.form.get("target_direction", "prev").strip().lower()
+    branch = request.form.get("branch", session.get("rev", "HEAD")).strip()
+
+    if not address or not sha:
+        return jsonify({"success": False, "error": "Repository address and commit SHA are required."})
+
+    expanded_path = os.path.abspath(os.path.expanduser(address))
+    try:
+        repo = RepoModifier(expanded_path)
+        result = repo.delete_commit(sha, target_direction=target_direction, branch=branch)
+        branch_info = repo.get_branches()
+
+        commits = []
+        for c in repo.get_commits(branch_info["active_branch"], max_count=20, skip=0):
+            date, time_part = make_time_str(c.authored_date)
+            matching = [b["name"] for b in branch_info["branches_data"] if b.get("sha") and (b["sha"] == c.hexsha or c.hexsha.startswith(b["sha"]))]
+            commits.append({
+                "sha": c.hexsha,
+                "message": c.message.split("\n")[0] if c.message else "",
+                "author": c.author.name if c.author else "",
+                "email": c.author.email if c.author else "",
+                "date": date,
+                "time": time_part,
+                "branches": matching,
+            })
+
+        session["commits_old"] = commits
+        absorbed_msg = f"merged into adjacent commit '{result.get('absorbed_into', '')}'" if result.get('absorbed_into') else "merged"
+        return jsonify({
+            "success": True,
+            "message": f"Commit '{sha[:7]}' deleted successfully and diff {absorbed_msg}. No file changes were lost.",
+            "commits": commits,
+            "branches": branch_info["branches"],
+            "branches_data": branch_info["branches_data"],
+            "active_branch": branch_info["active_branch"],
+            "total": repo.count_commits(branch_info["active_branch"])
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/make_changes", methods=["POST"])
 def make_changes():
     address = request.form.get("address", session.get("address", "")).strip()

@@ -244,6 +244,14 @@ var CommitForm = React.createClass({
 			newBranchName: "",
 			creatingBranch: false,
 			branchError: "",
+			// Delete Commit Modal
+			showDeleteModal: false,
+			deleteCommitSha: "",
+			deleteCommitMsg: "",
+			deleteCommitIndex: null,
+			deleteDirection: "prev",
+			deletingCommit: false,
+			deleteError: "",
 			newCommit: {
 				message: "",
 				author: firstCommit ? firstCommit.author : "",
@@ -485,6 +493,61 @@ var CommitForm = React.createClass({
 			that.setState({
 				creatingBranch: false,
 				branchError: "Network error: " + (err || "Could not reach server.")
+			});
+		});
+	},
+
+	openDeleteModal: function (index, commit) {
+		var hasPrev = (index < this.state.commits.length - 1);
+		var defaultDir = hasPrev ? "prev" : "next";
+		this.setState({
+			showDeleteModal: true,
+			deleteCommitSha: commit.sha,
+			deleteCommitMsg: commit.message,
+			deleteCommitIndex: index,
+			deleteDirection: defaultDir,
+			deleteError: "",
+			deletingCommit: false
+		});
+	},
+
+	closeDeleteModal: function () {
+		this.setState({
+			showDeleteModal: false,
+			deleteError: "",
+			deletingCommit: false
+		});
+	},
+
+	confirmDeleteCommit: function () {
+		var that = this;
+		that.setState({ deletingCommit: true, deleteError: "" });
+
+		$.post("/delete_commit", {
+			address: that.state.address,
+			sha: that.state.deleteCommitSha,
+			target_direction: that.state.deleteDirection,
+			branch: that.state.activeBranch || that.state.rev
+		}, function (data) {
+			that.setState({ deletingCommit: false });
+			if (data.success) {
+				that.setState({
+					showDeleteModal: false,
+					commits: data.commits || [],
+					originalCommits: JSON.parse(JSON.stringify(data.commits || [])),
+					branches: data.branches || that.state.branches,
+					branchesData: data.branches_data || that.state.branchesData,
+					total: data.total,
+					statusMessage: data.message || "Commit deleted and diff merged successfully.",
+					statusType: "success"
+				}, that.updateSmartContext);
+			} else {
+				that.setState({ deleteError: data.error || "Failed to delete commit." });
+			}
+		}).fail(function (xhr, status, err) {
+			that.setState({
+				deletingCommit: false,
+				deleteError: "Network error: " + (err || "Could not reach server.")
 			});
 		});
 	},
@@ -990,6 +1053,98 @@ var CommitForm = React.createClass({
 			);
 		}
 
+		// Delete Commit Modal (Merging diff into prev or next commit)
+		var deleteModal = null;
+		if (that.state.showDeleteModal) {
+			var hasPrev = (that.state.deleteCommitIndex < that.state.commits.length - 1);
+			var hasNext = (that.state.deleteCommitIndex > 0);
+			deleteModal = (
+				<div className="custom-modal-overlay">
+					<div className="custom-modal-card" style={{ maxWidth: "520px" }}>
+						<div className="custom-modal-header">
+							<h3><i className="trash alternate icon" style={{ color: "var(--color-red, #EF4444)" }}></i> Delete Commit (Zero File Loss)</h3>
+							<i className="close icon link" onClick={that.closeDeleteModal}></i>
+						</div>
+						<div className="custom-modal-body">
+							{that.state.deleteError ? (
+								<div className="ui negative message" style={{ margin: "0 0 12px 0" }}>
+									{that.state.deleteError}
+								</div>
+							) : null}
+							<p style={{ fontSize: "0.875rem", margin: "0 0 10px 0" }}>
+								Deleting commit <code style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{(that.state.deleteCommitSha || "").slice(0, 7)}</code>:
+							</p>
+							<div style={{ background: "var(--color-secondary)", padding: "10px 14px", borderRadius: "var(--radius-base)", marginBottom: "14px", fontSize: "0.875rem", fontStyle: "italic" }}>
+								"{that.state.deleteCommitMsg}"
+							</div>
+							<p style={{ fontSize: "0.8125rem", color: "var(--color-text-muted)", margin: "0 0 12px 0" }}>
+								All file changes in this commit will be <strong>preserved</strong> and safely merged into an adjacent commit. Where should the diff merge?
+							</p>
+
+							<div className="ui form">
+								<div className="grouped fields" style={{ margin: 0 }}>
+									<div className="field" style={{ marginBottom: "8px" }}>
+										<div className="ui radio checkbox">
+											<input
+												type="radio"
+												name="deleteDirection"
+												value="prev"
+												checked={that.state.deleteDirection === "prev"}
+												disabled={!hasPrev}
+												onChange={function () { that.setState({ deleteDirection: "prev" }); }}
+											/>
+											<label style={{ fontSize: "0.8125rem", cursor: hasPrev ? "pointer" : "not-allowed" }}>
+												<strong>Latch to Previous (Older) commit</strong>
+												<span style={{ display: "block", color: "var(--color-text-muted)", fontSize: "0.75rem" }}>
+													Merges this commit's changes directly into its parent commit.
+												</span>
+											</label>
+										</div>
+									</div>
+									<div className="field">
+										<div className="ui radio checkbox">
+											<input
+												type="radio"
+												name="deleteDirection"
+												value="next"
+												checked={that.state.deleteDirection === "next"}
+												disabled={!hasNext}
+												onChange={function () { that.setState({ deleteDirection: "next" }); }}
+											/>
+											<label style={{ fontSize: "0.8125rem", cursor: hasNext ? "pointer" : "not-allowed" }}>
+												<strong>Latch to Next (Newer) commit</strong>
+												<span style={{ display: "block", color: "var(--color-text-muted)", fontSize: "0.75rem" }}>
+													Bypasses this commit so its changes are absorbed by the child commit ahead of it.
+												</span>
+											</label>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div className="custom-modal-actions">
+							<button
+								type="button"
+								className="zero-btn-secondary"
+								onClick={that.closeDeleteModal}
+								disabled={that.state.deletingCommit}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								className={"zero-btn-primary " + (that.state.deletingCommit ? "loading disabled" : "")}
+								onClick={that.confirmDeleteCommit}
+								style={{ background: "var(--color-red, #EF4444)", borderColor: "var(--color-red, #EF4444)" }}
+							>
+								<i className="trash alternate icon"></i> Delete & Merge Diff
+							</button>
+						</div>
+					</div>
+				</div>
+			);
+		}
+
 		// Branch Creation Modal
 		var branchModal = null;
 		if (that.state.showBranchModal) {
@@ -1339,6 +1494,7 @@ var CommitForm = React.createClass({
 			<div className="sixteen wide column">
 				{statusAlert}
 				{confirmModal}
+				{deleteModal}
 				{branchModal}
 				{addCommitPanel}
 				{aiEngineerPanel}
@@ -1507,13 +1663,14 @@ var CommitForm = React.createClass({
 
 					<div className="ui form">
 						<div className="field" style={{ fontWeight: "600", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-secondary)", paddingBottom: "8px" }}>
-							<div className="six fields" style={{ margin: 0 }}>
+							<div className="fields" style={{ margin: 0 }}>
 								<div className="two wide field"><label>SHA (Read-Only)</label></div>
 								<div className="four wide field"><label>Commit Message</label></div>
 								<div className="three wide field"><label>Author Name</label></div>
 								<div className="three wide field"><label>Author Email</label></div>
 								<div className="two wide field"><label>Date</label></div>
-								<div className="two wide field"><label>Time</label></div>
+								<div className="one wide field"><label>Time</label></div>
+								<div className="one wide field" style={{ textAlign: "center" }}><label>Action</label></div>
 							</div>
 						</div>
 						{that.state.commits.map(function (commit, index) {
@@ -1524,7 +1681,7 @@ var CommitForm = React.createClass({
 									className={"commit-row " + (modified ? "modified-row" : "")}
 									key={commit.sha || index}
 								>
-									<div className="six fields" style={{ margin: 0 }}>
+									<div className="fields" style={{ margin: 0 }}>
 										<div className="two wide disabled field">
 											<input
 												type="text"
@@ -1566,13 +1723,24 @@ var CommitForm = React.createClass({
 												onChange={that.inputChange.bind(that, index, "date")}
 											/>
 										</div>
-										<div className="two wide field">
+										<div className="one wide field">
 											<input
 												type="text"
 												placeholder="HH:MM:SS"
 												value={commit.time}
 												onChange={that.inputChange.bind(that, index, "time")}
 											/>
+										</div>
+										<div className="one wide field" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+											<button
+												type="button"
+												className="zero-btn-secondary"
+												title="Delete commit (merge diff to prev or next)"
+												style={{ padding: "6px 8px", color: "var(--color-red, #EF4444)", borderColor: "transparent", background: "transparent" }}
+												onClick={function () { that.openDeleteModal(index, commit); }}
+											>
+												<i className="trash alternate outline icon" style={{ margin: 0, fontSize: "1rem" }}></i>
+											</button>
 										</div>
 									</div>
 								</div>
@@ -1791,17 +1959,29 @@ function initApiKeysModal() {
 
 $(document).ready(function () {
 	initApiKeysModal();
-	// Restore previous file path from localStorage so it is never lost on reload
+
+	// Check URL query parameters (e.g. from /rewrite CLI tool)
+	var urlParams = new URLSearchParams(window.location.search);
+	var queryAddr = urlParams.get("addr");
+	var queryRev = urlParams.get("rev");
+
+	// Restore previous file path from URL or localStorage so it is never lost on reload
 	var savedPath = localStorage.getItem("git_repo_path");
 	var savedRev = localStorage.getItem("git_repo_rev");
 
-	if (savedPath && savedPath.trim()) {
+	if (queryAddr && queryAddr.trim()) {
+		$("#addr-input").val(queryAddr.trim());
+		localStorage.setItem("git_repo_path", queryAddr.trim());
+	} else if (savedPath && savedPath.trim()) {
 		$("#addr-input").val(savedPath.trim());
 	} else if (!$("#addr-input").val()) {
 		$("#addr-input").val(".");
 	}
 
-	if (savedRev && savedRev.trim()) {
+	if (queryRev && queryRev.trim()) {
+		$("#rev-input").val(queryRev.trim());
+		localStorage.setItem("git_repo_rev", queryRev.trim());
+	} else if (savedRev && savedRev.trim()) {
 		$("#rev-input").val(savedRev.trim());
 	}
 

@@ -165,6 +165,14 @@ var CommitForm = React.createClass({
       newBranchName: "",
       creatingBranch: false,
       branchError: "",
+      // Delete Commit Modal
+      showDeleteModal: false,
+      deleteCommitSha: "",
+      deleteCommitMsg: "",
+      deleteCommitIndex: null,
+      deleteDirection: "prev",
+      deletingCommit: false,
+      deleteError: "",
       newCommit: {
         message: "",
         author: firstCommit ? firstCommit.author : "",
@@ -382,6 +390,57 @@ var CommitForm = React.createClass({
       that.setState({
         creatingBranch: false,
         branchError: "Network error: " + (err || "Could not reach server.")
+      });
+    });
+  },
+  openDeleteModal: function(index, commit) {
+    var hasPrev = index < this.state.commits.length - 1;
+    var defaultDir = hasPrev ? "prev" : "next";
+    this.setState({
+      showDeleteModal: true,
+      deleteCommitSha: commit.sha,
+      deleteCommitMsg: commit.message,
+      deleteCommitIndex: index,
+      deleteDirection: defaultDir,
+      deleteError: "",
+      deletingCommit: false
+    });
+  },
+  closeDeleteModal: function() {
+    this.setState({
+      showDeleteModal: false,
+      deleteError: "",
+      deletingCommit: false
+    });
+  },
+  confirmDeleteCommit: function() {
+    var that = this;
+    that.setState({ deletingCommit: true, deleteError: "" });
+    $.post("/delete_commit", {
+      address: that.state.address,
+      sha: that.state.deleteCommitSha,
+      target_direction: that.state.deleteDirection,
+      branch: that.state.activeBranch || that.state.rev
+    }, function(data) {
+      that.setState({ deletingCommit: false });
+      if (data.success) {
+        that.setState({
+          showDeleteModal: false,
+          commits: data.commits || [],
+          originalCommits: JSON.parse(JSON.stringify(data.commits || [])),
+          branches: data.branches || that.state.branches,
+          branchesData: data.branches_data || that.state.branchesData,
+          total: data.total,
+          statusMessage: data.message || "Commit deleted and diff merged successfully.",
+          statusType: "success"
+        }, that.updateSmartContext);
+      } else {
+        that.setState({ deleteError: data.error || "Failed to delete commit." });
+      }
+    }).fail(function(xhr, status, err) {
+      that.setState({
+        deletingCommit: false,
+        deleteError: "Network error: " + (err || "Could not reach server.")
       });
     });
   },
@@ -768,6 +827,55 @@ var CommitForm = React.createClass({
         " Confirm & Apply Changes"
       ))));
     }
+    var deleteModal = null;
+    if (that.state.showDeleteModal) {
+      var hasPrev = that.state.deleteCommitIndex < that.state.commits.length - 1;
+      var hasNext = that.state.deleteCommitIndex > 0;
+      deleteModal = /* @__PURE__ */ React.createElement("div", { className: "custom-modal-overlay" }, /* @__PURE__ */ React.createElement("div", { className: "custom-modal-card", style: { maxWidth: "520px" } }, /* @__PURE__ */ React.createElement("div", { className: "custom-modal-header" }, /* @__PURE__ */ React.createElement("h3", null, /* @__PURE__ */ React.createElement("i", { className: "trash alternate icon", style: { color: "var(--color-red, #EF4444)" } }), " Delete Commit (Zero File Loss)"), /* @__PURE__ */ React.createElement("i", { className: "close icon link", onClick: that.closeDeleteModal })), /* @__PURE__ */ React.createElement("div", { className: "custom-modal-body" }, that.state.deleteError ? /* @__PURE__ */ React.createElement("div", { className: "ui negative message", style: { margin: "0 0 12px 0" } }, that.state.deleteError) : null, /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.875rem", margin: "0 0 10px 0" } }, "Deleting commit ", /* @__PURE__ */ React.createElement("code", { style: { fontFamily: "var(--font-mono)", fontWeight: 700 } }, (that.state.deleteCommitSha || "").slice(0, 7)), ":"), /* @__PURE__ */ React.createElement("div", { style: { background: "var(--color-secondary)", padding: "10px 14px", borderRadius: "var(--radius-base)", marginBottom: "14px", fontSize: "0.875rem", fontStyle: "italic" } }, '"', that.state.deleteCommitMsg, '"'), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.8125rem", color: "var(--color-text-muted)", margin: "0 0 12px 0" } }, "All file changes in this commit will be ", /* @__PURE__ */ React.createElement("strong", null, "preserved"), " and safely merged into an adjacent commit. Where should the diff merge?"), /* @__PURE__ */ React.createElement("div", { className: "ui form" }, /* @__PURE__ */ React.createElement("div", { className: "grouped fields", style: { margin: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "field", style: { marginBottom: "8px" } }, /* @__PURE__ */ React.createElement("div", { className: "ui radio checkbox" }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "radio",
+          name: "deleteDirection",
+          value: "prev",
+          checked: that.state.deleteDirection === "prev",
+          disabled: !hasPrev,
+          onChange: function() {
+            that.setState({ deleteDirection: "prev" });
+          }
+        }
+      ), /* @__PURE__ */ React.createElement("label", { style: { fontSize: "0.8125rem", cursor: hasPrev ? "pointer" : "not-allowed" } }, /* @__PURE__ */ React.createElement("strong", null, "Latch to Previous (Older) commit"), /* @__PURE__ */ React.createElement("span", { style: { display: "block", color: "var(--color-text-muted)", fontSize: "0.75rem" } }, "Merges this commit's changes directly into its parent commit.")))), /* @__PURE__ */ React.createElement("div", { className: "field" }, /* @__PURE__ */ React.createElement("div", { className: "ui radio checkbox" }, /* @__PURE__ */ React.createElement(
+        "input",
+        {
+          type: "radio",
+          name: "deleteDirection",
+          value: "next",
+          checked: that.state.deleteDirection === "next",
+          disabled: !hasNext,
+          onChange: function() {
+            that.setState({ deleteDirection: "next" });
+          }
+        }
+      ), /* @__PURE__ */ React.createElement("label", { style: { fontSize: "0.8125rem", cursor: hasNext ? "pointer" : "not-allowed" } }, /* @__PURE__ */ React.createElement("strong", null, "Latch to Next (Newer) commit"), /* @__PURE__ */ React.createElement("span", { style: { display: "block", color: "var(--color-text-muted)", fontSize: "0.75rem" } }, "Bypasses this commit so its changes are absorbed by the child commit ahead of it."))))))), /* @__PURE__ */ React.createElement("div", { className: "custom-modal-actions" }, /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          type: "button",
+          className: "zero-btn-secondary",
+          onClick: that.closeDeleteModal,
+          disabled: that.state.deletingCommit
+        },
+        "Cancel"
+      ), /* @__PURE__ */ React.createElement(
+        "button",
+        {
+          type: "button",
+          className: "zero-btn-primary " + (that.state.deletingCommit ? "loading disabled" : ""),
+          onClick: that.confirmDeleteCommit,
+          style: { background: "var(--color-red, #EF4444)", borderColor: "var(--color-red, #EF4444)" }
+        },
+        /* @__PURE__ */ React.createElement("i", { className: "trash alternate icon" }),
+        " Delete & Merge Diff"
+      ))));
+    }
     var branchModal = null;
     if (that.state.showBranchModal) {
       branchModal = /* @__PURE__ */ React.createElement("div", { className: "custom-modal-overlay" }, /* @__PURE__ */ React.createElement("div", { className: "custom-modal-card", style: { maxWidth: "480px" } }, /* @__PURE__ */ React.createElement("div", { className: "custom-modal-header" }, /* @__PURE__ */ React.createElement("h3", null, /* @__PURE__ */ React.createElement("i", { className: "code branch icon", style: { color: "var(--color-accent)" } }), " Create New Git Branch"), /* @__PURE__ */ React.createElement("i", { className: "close icon link", onClick: that.closeBranchModal })), that.state.branchError ? /* @__PURE__ */ React.createElement("div", { className: "ui negative message" }, that.state.branchError) : null, /* @__PURE__ */ React.createElement("form", { className: "ui form", onSubmit: that.submitCreateBranch }, /* @__PURE__ */ React.createElement("div", { className: "field required" }, /* @__PURE__ */ React.createElement("label", null, "New Branch Name"), /* @__PURE__ */ React.createElement(
@@ -1022,7 +1130,7 @@ var CommitForm = React.createClass({
     }
     var statsTotalText = that.state.total !== null ? " of " + that.state.total : "";
     var hasPendingChanges = modifiedCount > 0 || originChanged;
-    return /* @__PURE__ */ React.createElement("div", { className: "sixteen wide column" }, statusAlert, confirmModal, branchModal, addCommitPanel, aiEngineerPanel, /* @__PURE__ */ React.createElement(
+    return /* @__PURE__ */ React.createElement("div", { className: "sixteen wide column" }, statusAlert, confirmModal, deleteModal, branchModal, addCommitPanel, aiEngineerPanel, /* @__PURE__ */ React.createElement(
       GitVisualizer,
       {
         commits: that.state.commits,
@@ -1152,7 +1260,7 @@ var CommitForm = React.createClass({
       /* @__PURE__ */ React.createElement("i", { className: "magic icon" }),
       " Make Changes ",
       hasPendingChanges ? "(" + (modifiedCount + (originChanged ? 1 : 0)) + ")" : ""
-    ))), /* @__PURE__ */ React.createElement("div", { className: "ui form" }, /* @__PURE__ */ React.createElement("div", { className: "field", style: { fontWeight: "600", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-secondary)", paddingBottom: "8px" } }, /* @__PURE__ */ React.createElement("div", { className: "six fields", style: { margin: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "two wide field" }, /* @__PURE__ */ React.createElement("label", null, "SHA (Read-Only)")), /* @__PURE__ */ React.createElement("div", { className: "four wide field" }, /* @__PURE__ */ React.createElement("label", null, "Commit Message")), /* @__PURE__ */ React.createElement("div", { className: "three wide field" }, /* @__PURE__ */ React.createElement("label", null, "Author Name")), /* @__PURE__ */ React.createElement("div", { className: "three wide field" }, /* @__PURE__ */ React.createElement("label", null, "Author Email")), /* @__PURE__ */ React.createElement("div", { className: "two wide field" }, /* @__PURE__ */ React.createElement("label", null, "Date")), /* @__PURE__ */ React.createElement("div", { className: "two wide field" }, /* @__PURE__ */ React.createElement("label", null, "Time")))), that.state.commits.map(function(commit, index) {
+    ))), /* @__PURE__ */ React.createElement("div", { className: "ui form" }, /* @__PURE__ */ React.createElement("div", { className: "field", style: { fontWeight: "600", fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-secondary)", paddingBottom: "8px" } }, /* @__PURE__ */ React.createElement("div", { className: "fields", style: { margin: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "two wide field" }, /* @__PURE__ */ React.createElement("label", null, "SHA (Read-Only)")), /* @__PURE__ */ React.createElement("div", { className: "four wide field" }, /* @__PURE__ */ React.createElement("label", null, "Commit Message")), /* @__PURE__ */ React.createElement("div", { className: "three wide field" }, /* @__PURE__ */ React.createElement("label", null, "Author Name")), /* @__PURE__ */ React.createElement("div", { className: "three wide field" }, /* @__PURE__ */ React.createElement("label", null, "Author Email")), /* @__PURE__ */ React.createElement("div", { className: "two wide field" }, /* @__PURE__ */ React.createElement("label", null, "Date")), /* @__PURE__ */ React.createElement("div", { className: "one wide field" }, /* @__PURE__ */ React.createElement("label", null, "Time")), /* @__PURE__ */ React.createElement("div", { className: "one wide field", style: { textAlign: "center" } }, /* @__PURE__ */ React.createElement("label", null, "Action")))), that.state.commits.map(function(commit, index) {
       var modified = that.isModified(index);
       return /* @__PURE__ */ React.createElement(
         "div",
@@ -1161,7 +1269,7 @@ var CommitForm = React.createClass({
           className: "commit-row " + (modified ? "modified-row" : ""),
           key: commit.sha || index
         },
-        /* @__PURE__ */ React.createElement("div", { className: "six fields", style: { margin: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "two wide disabled field" }, /* @__PURE__ */ React.createElement(
+        /* @__PURE__ */ React.createElement("div", { className: "fields", style: { margin: 0 } }, /* @__PURE__ */ React.createElement("div", { className: "two wide disabled field" }, /* @__PURE__ */ React.createElement(
           "input",
           {
             type: "text",
@@ -1202,7 +1310,7 @@ var CommitForm = React.createClass({
             value: commit.date,
             onChange: that.inputChange.bind(that, index, "date")
           }
-        )), /* @__PURE__ */ React.createElement("div", { className: "two wide field" }, /* @__PURE__ */ React.createElement(
+        )), /* @__PURE__ */ React.createElement("div", { className: "one wide field" }, /* @__PURE__ */ React.createElement(
           "input",
           {
             type: "text",
@@ -1210,6 +1318,18 @@ var CommitForm = React.createClass({
             value: commit.time,
             onChange: that.inputChange.bind(that, index, "time")
           }
+        )), /* @__PURE__ */ React.createElement("div", { className: "one wide field", style: { display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement(
+          "button",
+          {
+            type: "button",
+            className: "zero-btn-secondary",
+            title: "Delete commit (merge diff to prev or next)",
+            style: { padding: "6px 8px", color: "var(--color-red, #EF4444)", borderColor: "transparent", background: "transparent" },
+            onClick: function() {
+              that.openDeleteModal(index, commit);
+            }
+          },
+          /* @__PURE__ */ React.createElement("i", { className: "trash alternate outline icon", style: { margin: 0, fontSize: "1rem" } })
         )))
       );
     })), loadMoreSection, /* @__PURE__ */ React.createElement("div", { style: { marginTop: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" } }, /* @__PURE__ */ React.createElement(
@@ -1408,14 +1528,23 @@ function initApiKeysModal() {
 }
 $(document).ready(function() {
   initApiKeysModal();
+  var urlParams = new URLSearchParams(window.location.search);
+  var queryAddr = urlParams.get("addr");
+  var queryRev = urlParams.get("rev");
   var savedPath = localStorage.getItem("git_repo_path");
   var savedRev = localStorage.getItem("git_repo_rev");
-  if (savedPath && savedPath.trim()) {
+  if (queryAddr && queryAddr.trim()) {
+    $("#addr-input").val(queryAddr.trim());
+    localStorage.setItem("git_repo_path", queryAddr.trim());
+  } else if (savedPath && savedPath.trim()) {
     $("#addr-input").val(savedPath.trim());
   } else if (!$("#addr-input").val()) {
     $("#addr-input").val(".");
   }
-  if (savedRev && savedRev.trim()) {
+  if (queryRev && queryRev.trim()) {
+    $("#rev-input").val(queryRev.trim());
+    localStorage.setItem("git_repo_rev", queryRev.trim());
+  } else if (savedRev && savedRev.trim()) {
     $("#rev-input").val(savedRev.trim());
   }
   $("#addr-input").on("input change", function() {

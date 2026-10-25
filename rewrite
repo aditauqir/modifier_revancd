@@ -10,19 +10,32 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_DIR="${1:-$PWD}"
-TARGET_REV="${2:-HEAD}"
+INPUT_DIR="${1:-$PWD}"
+INPUT_REV="${2:-}"
 
-# Resolve absolute path for target directory
-if [ -d "$TARGET_DIR" ]; then
-    TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+# Check if target directory is inside a git repository
+if git -C "$INPUT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    TARGET_DIR="$(git -C "$INPUT_DIR" rev-parse --show-toplevel)"
+    if [ -n "$INPUT_REV" ]; then
+        TARGET_REV="$INPUT_REV"
+    else
+        TARGET_REV="$(git -C "$INPUT_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")"
+    fi
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Git Repo Modifier — Launching /rewrite"
+    echo "  ✓ Detected Git Repository: $TARGET_DIR"
+    echo "  ✓ Active Branch / Rev:     $TARGET_REV"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+else
+    TARGET_DIR="$SCRIPT_DIR"
+    TARGET_REV="${INPUT_REV:-HEAD}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Git Repo Modifier — Launching /rewrite"
+    echo "  ℹ Notice: Not inside a Git repo ($INPUT_DIR)"
+    echo "  ✓ Falling back to default: $TARGET_DIR"
+    echo "  ✓ Revision:                $TARGET_REV"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 fi
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Git Repo Modifier — Launching /rewrite"
-echo "  Target Repo: $TARGET_DIR"
-echo "  Revision:    $TARGET_REV"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Select Python environment (.venv if present, otherwise system python3)
 if [ -f "$SCRIPT_DIR/.venv/bin/python" ]; then
@@ -43,8 +56,11 @@ else
     sleep 1.2
 fi
 
-# Open web interface in default browser
-URL="http://127.0.0.1:5000"
+# Encode URL parameters so browser immediately loads this repository
+ENCODED_ADDR="$(python3 -c 'import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))' "$TARGET_DIR")"
+ENCODED_REV="$(python3 -c 'import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))' "$TARGET_REV")"
+URL="http://127.0.0.1:5000/?addr=${ENCODED_ADDR}&rev=${ENCODED_REV}"
+
 echo "  Browser: Opening $URL ..."
 if command -v open >/dev/null 2>&1; then
     open "$URL"
