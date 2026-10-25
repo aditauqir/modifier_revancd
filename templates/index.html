@@ -32,11 +32,6 @@
 					<span id="api-keys-label">API Keys</span>
 					<span class="key-status-dot" id="api-keys-dot"></span>
 				</button>
-
-				<button class="voice-mic-btn" id="voice-cmd-btn" type="button" title="Click to trigger voice command (e.g. 'Make changes', 'Reload')">
-					<span class="voice-indicator-dot"></span>
-					<span id="voice-label">Voice Ready</span>
-				</button>
 			</div>
 		</header>
 
@@ -62,6 +57,29 @@
 							<button class="ui basic icon button toggle-pwd" type="button" data-target="key-openrouter" title="Toggle visibility">
 								<i class="eye icon"></i>
 							</button>
+						</div>
+						<div style="margin-top: 8px;">
+							<label style="display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 4px;">
+								OpenRouter Model (Type any model ID as in OpenRouter docs)
+							</label>
+							<input
+								type="text"
+								id="model-openrouter"
+								placeholder="e.g. anthropic/claude-3.5-sonnet, deepseek/deepseek-r1, openai/gpt-4o"
+								list="openrouter-models-datalist"
+								autocomplete="off"
+							>
+							<datalist id="openrouter-models-datalist">
+								<option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+								<option value="deepseek/deepseek-r1">DeepSeek R1</option>
+								<option value="deepseek/deepseek-chat">DeepSeek V3 (chat)</option>
+								<option value="openai/gpt-4o">GPT-4o</option>
+								<option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+								<option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (Free)</option>
+								<option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</option>
+								<option value="qwen/qwen-2.5-coder-32b-instruct">Qwen 2.5 Coder 32B</option>
+								<option value="mistralai/mistral-large-2411">Mistral Large</option>
+							</datalist>
 						</div>
 					</div>
 

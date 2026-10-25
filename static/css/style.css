@@ -25,9 +25,9 @@
 	--radius-sm: 6px;
 	--radius-full: 9999px;
 
-	--shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.05);
-	--shadow-card: 0 2px 12px rgba(0, 0, 0, 0.04);
-	--shadow-modal: 0 16px 32px rgba(0, 0, 0, 0.08);
+	--shadow-subtle: none;
+	--shadow-card: none;
+	--shadow-modal: none;
 
 	--font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 	--font-mono: "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
@@ -118,7 +118,6 @@ body {
 	align-items: center;
 	gap: 6px;
 	transition: all 200ms ease-out;
-	box-shadow: var(--shadow-subtle);
 }
 
 .key-popout-btn:hover {
@@ -131,60 +130,11 @@ body {
 	height: 8px;
 	border-radius: 50%;
 	background: #D4D4D8;
-	transition: background 200ms ease-out, box-shadow 200ms ease-out;
+	transition: background 200ms ease-out;
 }
 
 .key-status-dot.configured {
 	background: var(--color-green);
-	box-shadow: 0 0 6px rgba(22, 163, 74, 0.4);
-}
-
-.voice-mic-btn {
-	background: #FFFFFF;
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-full);
-	padding: 6px 14px;
-	font-size: 0.8125rem;
-	font-weight: 500;
-	color: var(--color-text);
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	transition: all 200ms ease-out;
-	box-shadow: var(--shadow-subtle);
-}
-
-.voice-mic-btn:hover {
-	border-color: #A1A1AA;
-	background: var(--color-tertiary);
-}
-
-.voice-mic-btn.active {
-	background: #FEF2F2;
-	border-color: #F87171;
-	color: #DC2626;
-	animation: voicePulse 1.5s infinite;
-}
-
-.voice-indicator-dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: #71717A;
-}
-
-.voice-mic-btn.active .voice-indicator-dot {
-	background: #DC2626;
-}
-
-@keyframes voicePulse {
-	0%, 100% {
-		box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
-	}
-	50% {
-		box-shadow: 0 0 0 6px rgba(220, 38, 38, 0);
-	}
 }
 
 /* Smart Context & Suggestions Bar */
@@ -200,7 +150,6 @@ body {
 	font-size: 0.8125rem;
 	color: #5C4A33;
 	animation: fadeIn 300ms ease-out;
-	box-shadow: var(--shadow-subtle);
 }
 
 .smart-suggestion-pill {
@@ -212,11 +161,10 @@ body {
 
 /* Toolbar & Inputs */
 .repo-toolbar {
-	background: #FFFFFF;
-	padding: 1.25rem 1.5rem;
-	border-radius: var(--radius-base);
-	border: 1px solid var(--color-secondary);
-	box-shadow: var(--shadow-card);
+	background: transparent;
+	padding: 0 0 1.5rem 0;
+	border: none;
+	border-bottom: 1px solid var(--color-secondary);
 	margin-bottom: 1.5rem;
 	animation: enterUp 420ms ease-out;
 }
@@ -246,13 +194,12 @@ body {
 	font-size: 0.9375rem;
 	color: var(--color-text);
 	outline: none;
-	transition: border-color 200ms ease-out, box-shadow 200ms ease-out;
+	transition: border-color 200ms ease-out;
 	font-family: var(--font-sans);
 }
 
 .zero-input:focus {
 	border-color: var(--color-accent);
-	box-shadow: 0 0 0 2px var(--color-accent-subtle);
 }
 
 .zero-btn-primary {
@@ -273,8 +220,6 @@ body {
 
 .zero-btn-primary:hover {
 	background: #27272A;
-	transform: translateY(-1px);
-	box-shadow: var(--shadow-subtle);
 }
 
 .zero-btn-primary:active {
@@ -301,14 +246,14 @@ body {
 	border-color: #D4D4D8;
 }
 
-/* Visualizer Card */
+/* Visualizer Card (Clean Flat Borderless) */
 .git-visualizer-card {
-	background: #FFFFFF;
-	border: 1px solid var(--color-secondary);
-	border-radius: var(--radius-base);
-	padding: 1.25rem 1.5rem;
+	background: transparent;
+	border: none;
+	border-bottom: 1px solid var(--color-secondary);
+	border-radius: 0;
+	padding: 0 0 1.5rem 0;
 	margin-bottom: 1.5rem;
-	box-shadow: var(--shadow-card);
 	width: 100%;
 	animation: enterUp 420ms ease-out;
 }
@@ -480,7 +425,6 @@ body {
 	color: #18181B;
 	font-size: 10px;
 	font-weight: 700;
-	box-shadow: var(--shadow-subtle);
 	transition: all 200ms ease-out;
 }
 
@@ -488,7 +432,6 @@ body {
 	background: var(--color-orange);
 	border-color: #F59E0B;
 	color: #FFFFFF;
-	box-shadow: 0 0 10px rgba(217, 119, 6, 0.4);
 }
 
 .node-sha {
@@ -566,19 +509,18 @@ body {
 	gap: 6px;
 }
 
-/* Branch & Origin Controls Bar */
+/* Branch & Origin Controls Bar (Flat minimal) */
 .branch-origin-bar {
-	background: #FFFFFF;
-	border: 1px solid var(--color-secondary);
-	border-radius: var(--radius-base);
-	padding: 12px 18px;
+	background: transparent;
+	border: none;
+	border-bottom: 1px solid var(--color-secondary);
+	padding: 0.5rem 0 1rem 0;
 	margin-bottom: 1.5rem;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	flex-wrap: wrap;
 	gap: 12px;
-	box-shadow: var(--shadow-card);
 }
 
 .branch-controls-group {
@@ -631,13 +573,11 @@ body {
 	border-color: var(--color-border);
 }
 
-/* Commit Table Card */
+/* Commit Table (Flat, No Box Enclosures) */
 .commit-table-card {
-	background: #FFFFFF;
-	border-radius: var(--radius-base);
-	border: 1px solid var(--color-secondary);
-	box-shadow: var(--shadow-card);
-	padding: 1.5rem;
+	background: transparent;
+	border: none;
+	padding: 0;
 	margin-bottom: 1.5rem;
 	width: 100%;
 	animation: enterUp 420ms ease-out;
@@ -701,7 +641,6 @@ body {
 	border-radius: var(--radius-base);
 	padding: 1.25rem 1.5rem;
 	margin-bottom: 1.5rem;
-	box-shadow: var(--shadow-subtle);
 	animation: enterUp 300ms ease-out;
 }
 
@@ -739,7 +678,6 @@ body {
 	width: 100%;
 	max-height: 90vh;
 	overflow-y: auto;
-	box-shadow: var(--shadow-modal);
 	padding: 1.75rem;
 	border: 1px solid var(--color-border);
 	animation: enterUp 300ms ease-out;
@@ -834,14 +772,6 @@ body {
 	}
 }
 
-@keyframes amberPulse {
-	0%, 100% {
-		box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4);
-	}
-	50% {
-		box-shadow: 0 0 0 5px rgba(217, 119, 6, 0);
-	}
-}
 
 @keyframes highlightFlash {
 	0% {

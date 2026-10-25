@@ -187,9 +187,9 @@ fi
 
         return command
 
-    def get_commits(self, rev=None, max_count=20, skip=0):
+    def get_commits(self, rev=None, max_count=20, skip=0, include_all_branches=True):
         """\
-        Getting commits behind the given revision or current branch.
+        Getting commits behind the given revision or across all branches.
         """
         if not self.repo:
             raise git.InvalidGitRepositoryError
@@ -206,7 +206,14 @@ fi
         if skip is not None and skip > 0:
             kwargs["skip"] = skip
 
-        yield from self.repo.iter_commits(rev, **kwargs)
+        if include_all_branches and self.repo.heads:
+            refs = [rev]
+            for h in self.repo.heads:
+                if h.name not in refs:
+                    refs.append(h.name)
+            yield from self.repo.iter_commits(refs, **kwargs)
+        else:
+            yield from self.repo.iter_commits(rev, **kwargs)
 
     def count_commits(self, rev=None):
         """\
@@ -255,19 +262,36 @@ fi
 
     def get_branches(self):
         """
-        Get all local branch names and active branch.
+        Get all local branch names, tip commit SHAs, and active branch.
         """
         if not self.repo:
             raise git.InvalidGitRepositoryError
-        branches = [h.name for h in self.repo.heads]
+        branches = []
+        branches_data = []
         try:
             active = self.repo.active_branch.name
         except Exception:
             active = "HEAD"
+
+        for h in self.repo.heads:
+            branches.append(h.name)
+            try:
+                c_sha = h.commit.hexsha
+            except Exception:
+                c_sha = ""
+            branches_data.append({
+                "name": h.name,
+                "sha": c_sha,
+                "is_active": (h.name == active)
+            })
+
         if not branches:
             branches = [active] if active != "HEAD" else ["master"]
+            branches_data = [{"name": branches[0], "sha": "", "is_active": True}]
+
         return {
             "branches": branches,
+            "branches_data": branches_data,
             "active_branch": active
         }
 

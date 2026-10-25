@@ -1,7 +1,10 @@
 var GitVisualizer = React.createClass({
 	render: function () {
+		var that = this;
 		var commits = this.props.commits || [];
 		var originalCommits = this.props.originalCommits || [];
+		var branches = this.props.branches || [];
+		var branchesData = this.props.branchesData || [];
 		var activeBranch = this.props.activeBranch || "master";
 		var isTiedToOrigin = this.props.isTiedToOrigin;
 		var originUrl = this.props.originUrl;
@@ -45,17 +48,41 @@ var GitVisualizer = React.createClass({
 						<span>Commit History Visualizer</span>
 						<span className="zero-pill zero-pill-neutral">Live Preview</span>
 					</div>
-					<div className="visualizer-badges">
-						<span className="zero-pill zero-pill-accent">
-							<i className="code branch icon"></i> {activeBranch}
-						</span>
+
+					<div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+						<div className="visualizer-branches-list" style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+							<span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", fontWeight: 600 }}>Branches:</span>
+							{branches.map(function (b) {
+								var isActive = (b === activeBranch);
+								return (
+									<button
+										key={b}
+										type="button"
+										className={"zero-pill " + (isActive ? "zero-pill-accent" : "zero-pill-neutral")}
+										style={{ cursor: "pointer", border: isActive ? "1px solid #18181B" : "1px solid var(--color-border)" }}
+										onClick={function () { if (that.props.onSwitchBranch) that.props.onSwitchBranch(b); }}
+										title={isActive ? "Current Active Branch" : "Click to switch to branch " + b}
+									>
+										<i className="code branch icon"></i> {b}
+									</button>
+								);
+							})}
+							<button
+								type="button"
+								className="zero-pill zero-pill-neutral"
+								style={{ cursor: "pointer", border: "1px dashed var(--color-border)" }}
+								onClick={that.props.onOpenBranchModal}
+								title="Create a new branch"
+							>
+								<i className="plus icon"></i> New Branch
+							</button>
+						</div>
+
 						<span className={"zero-pill " + (isTiedToOrigin || newOriginUrl ? "zero-pill-accent" : "zero-pill-neutral")} title={originDisplay}>
 							<i className={(isTiedToOrigin || newOriginUrl ? "cloud" : "unlink") + " icon"}></i>
-							{originDisplay.length > 34 ? originDisplay.slice(0, 34) + "..." : originDisplay}
+							{originDisplay.length > 28 ? originDisplay.slice(0, 28) + "..." : originDisplay}
 						</span>
-						<span className="zero-pill zero-pill-neutral">
-							{commits.length} commits
-						</span>
+
 						{modifiedCount > 0 ? (
 							<span className="zero-pill zero-pill-orange">
 								<i className="edit outline icon"></i> {modifiedCount} pending
@@ -82,7 +109,28 @@ var GitVisualizer = React.createClass({
 							);
 							var isHead = (idx === 0);
 
+							// Collect all branches whose tip points to this commit
+							var nodeBranches = [];
+							if (c.branches && c.branches.length > 0) {
+								nodeBranches = c.branches.slice();
+							} else if (branchesData && branchesData.length > 0) {
+								for (var bi = 0; bi < branchesData.length; bi++) {
+									var bd = branchesData[bi];
+									if (bd.sha && (bd.sha === c.sha || bd.sha.indexOf(c.sha) === 0 || c.sha.indexOf(bd.sha) === 0)) {
+										if (nodeBranches.indexOf(bd.name) === -1) {
+											nodeBranches.push(bd.name);
+										}
+									}
+								}
+							}
+							if (isHead && nodeBranches.indexOf(activeBranch) === -1) {
+								nodeBranches.unshift(activeBranch);
+							}
+
 							var tooltip = "Commit: " + (c.sha ? c.sha.slice(0, 7) : "") + "\nMessage: " + c.message + "\nAuthor: " + c.author + "\nDate: " + c.date + " " + c.time;
+							if (nodeBranches.length > 0) {
+								tooltip += "\nBranches: " + nodeBranches.join(", ");
+							}
 							if (isMod) {
 								tooltip += "\n\n[MODIFIED (PENDING CONFIRMATION)]";
 								if (c.message !== orig.message) tooltip += "\nOriginal Msg: " + orig.message;
@@ -99,7 +147,23 @@ var GitVisualizer = React.createClass({
 								>
 									<div className="visualizer-node-badges">
 										{isHead ? <span className="v-badge v-badge-head">HEAD</span> : null}
-										{isHead ? <span className="v-badge v-badge-branch">{activeBranch}</span> : null}
+										{nodeBranches.map(function (bName) {
+											var isActive = (bName === activeBranch);
+											return (
+												<span
+													key={bName}
+													className={"v-badge v-badge-branch " + (isActive ? "active" : "secondary")}
+													style={{
+														background: isActive ? "#18181B" : "#FFFFFF",
+														color: isActive ? "#FAFAFA" : "#18181B",
+														border: isActive ? "1px solid #18181B" : "1px solid #71717A"
+													}}
+													title={"Branch: " + bName + (isActive ? " (Active HEAD)" : "")}
+												>
+													<i className="code branch icon"></i>{bName}
+												</span>
+											);
+										})}
 										{isHead && (isTiedToOrigin || newOriginUrl) ? <span className="v-badge v-badge-origin">origin</span> : null}
 										{isMod ? <span className="v-badge v-badge-modified">EDITED</span> : null}
 									</div>
@@ -133,7 +197,7 @@ var GitVisualizer = React.createClass({
 
 				<div className="visualizer-hint">
 					<i className="info circle icon"></i>
-					<span>Interactive ambient graph: click any node to focus commit row. Edits are live visual previews and will <strong>NOT</strong> modify git until you confirm.</span>
+					<span>Click any commit node to jump to its row. Live preview dynamically reflects all branch pointers and pending commit modifications.</span>
 				</div>
 			</div>
 		);
@@ -190,13 +254,14 @@ var CommitForm = React.createClass({
 			showLLMModal: false,
 			llmProvider: localStorage.getItem("preferred_llm_provider") || "openrouter",
 			llmApiKey: localStorage.getItem((localStorage.getItem("preferred_llm_provider") || "openrouter") + "_api_key") || "",
-			llmModel: (localStorage.getItem("preferred_llm_provider") || "openrouter") === "openrouter" ? "anthropic/claude-3.5-sonnet" : ((localStorage.getItem("preferred_llm_provider") || "openrouter") === "deepseek" ? "deepseek-chat" : "gpt-4o"),
+			llmModel: (localStorage.getItem("preferred_llm_provider") || "openrouter") === "openrouter" ? (localStorage.getItem("openrouter_model") || "anthropic/claude-3.5-sonnet") : ((localStorage.getItem("preferred_llm_provider") || "openrouter") === "deepseek" ? "deepseek-chat" : "gpt-4o"),
 			llmBaseUrl: localStorage.getItem("custom_api_url") || "",
 			llmPrompt: "",
 			llmSystemPrompt: "",
 			loadingLLM: false,
 			llmError: "",
-			llmGeneratedCommits: []
+			llmGeneratedCommits: [],
+			branchesData: this.props.branchesData || []
 		};
 	},
 
@@ -223,6 +288,7 @@ var CommitForm = React.createClass({
 			address: nextProps.address || "",
 			rev: nextProps.rev || "HEAD",
 			branches: nextProps.branches || this.state.branches,
+			branchesData: nextProps.branchesData || this.state.branchesData,
 			activeBranch: nextProps.activeBranch || nextProps.rev || "master",
 			hasOrigin: !!nextProps.hasOrigin,
 			originUrl: nextProps.originUrl || "",
@@ -319,6 +385,10 @@ var CommitForm = React.createClass({
 		}
 	},
 
+	switchBranchTo: function (branchName) {
+		this.switchBranch(branchName);
+	},
+
 	switchBranch: function (branchName) {
 		var that = this;
 		that.setState({ statusMessage: "Switching to branch " + branchName + "...", statusType: "info" });
@@ -336,6 +406,7 @@ var CommitForm = React.createClass({
 					rev: data.rev || branchName,
 					activeBranch: data.active_branch || branchName,
 					branches: data.branches || that.state.branches,
+					branchesData: data.branches_data || that.state.branchesData,
 					hasOrigin: !!data.has_origin,
 					originUrl: data.origin_url || "",
 					isTiedToOrigin: !!data.is_tied_to_origin,
@@ -397,14 +468,16 @@ var CommitForm = React.createClass({
 				that.setState({
 					showBranchModal: false,
 					branches: data.branches,
+					branchesData: data.branches_data || that.state.branchesData,
 					activeBranch: data.branch,
 					rev: data.branch,
+					commits: data.commits && data.commits.length > 0 ? data.commits : that.state.commits,
+					originalCommits: data.commits && data.commits.length > 0 ? JSON.parse(JSON.stringify(data.commits)) : that.state.originalCommits,
 					statusMessage: data.message || "Branch created successfully!",
 					statusType: "success"
 				});
 				$("#rev-input").val(data.branch);
 				localStorage.setItem("git_repo_rev", data.branch);
-				that.switchBranch(data.branch);
 			} else {
 				that.setState({ branchError: data.error || "Failed to create branch." });
 			}
@@ -549,6 +622,11 @@ var CommitForm = React.createClass({
 		this.setState({ newCommit: updated });
 	},
 
+	setOpenRouterModel: function (modelName) {
+		localStorage.setItem("openrouter_model", modelName);
+		this.setState({ llmModel: modelName });
+	},
+
 	handleLLMFieldChange: function (field, event) {
 		var val = event.target.value;
 		var update = {};
@@ -558,7 +636,7 @@ var CommitForm = React.createClass({
 			var key = localStorage.getItem(val + "_api_key") || "";
 			update.llmApiKey = key;
 			if (val === "openrouter") {
-				update.llmModel = "anthropic/claude-3.5-sonnet";
+				update.llmModel = localStorage.getItem("openrouter_model") || "anthropic/claude-3.5-sonnet";
 			} else if (val === "deepseek") {
 				update.llmModel = "deepseek-chat";
 			} else if (val === "openai") {
@@ -576,8 +654,12 @@ var CommitForm = React.createClass({
 			if (typeof updateApiKeyStatusDot === "function") updateApiKeyStatusDot();
 		} else if (field === "llmBaseUrl") {
 			localStorage.setItem("custom_api_url", val.trim());
-		} else if (field === "llmModel" && this.state.llmProvider === "custom") {
-			localStorage.setItem("custom_api_model", val.trim());
+		} else if (field === "llmModel") {
+			if (this.state.llmProvider === "openrouter") {
+				localStorage.setItem("openrouter_model", val.trim());
+			} else if (this.state.llmProvider === "custom") {
+				localStorage.setItem("custom_api_model", val.trim());
+			}
 		}
 		this.setState(update);
 	},
@@ -1069,12 +1151,13 @@ var CommitForm = React.createClass({
 								</select>
 							</div>
 							<div className="field">
-								<label>Model</label>
+								<label>Model (Type any model ID from OpenRouter docs)</label>
 								<input
 									type="text"
-									placeholder={that.state.llmProvider === "openrouter" ? "anthropic/claude-3.5-sonnet" : (that.state.llmProvider === "deepseek" ? "deepseek-chat" : "gpt-4o")}
+									placeholder={that.state.llmProvider === "openrouter" ? "e.g. anthropic/claude-3.5-sonnet" : (that.state.llmProvider === "deepseek" ? "deepseek-chat" : "gpt-4o")}
 									value={that.state.llmModel}
 									onChange={that.handleLLMFieldChange.bind(that, "llmModel")}
+									list={that.state.llmProvider === "openrouter" ? "openrouter-models-datalist" : undefined}
 								/>
 							</div>
 							<div className="field required">
@@ -1087,6 +1170,35 @@ var CommitForm = React.createClass({
 								/>
 							</div>
 						</div>
+
+						{that.state.llmProvider === "openrouter" ? (
+							<div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px", alignItems: "center" }}>
+								<span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", fontWeight: 600 }}>Quick Select:</span>
+								{[
+									"anthropic/claude-3.5-sonnet",
+									"deepseek/deepseek-r1",
+									"deepseek/deepseek-chat",
+									"openai/gpt-4o",
+									"openai/gpt-4o-mini",
+									"google/gemini-2.0-flash-exp:free",
+									"meta-llama/llama-3.3-70b-instruct",
+									"qwen/qwen-2.5-coder-32b-instruct"
+								].map(function (m) {
+									var isCurrent = (that.state.llmModel === m);
+									return (
+										<button
+											key={m}
+											type="button"
+											className={"zero-pill " + (isCurrent ? "zero-pill-accent" : "zero-pill-neutral")}
+											style={{ cursor: "pointer", border: isCurrent ? "1px solid #18181B" : "1px solid var(--color-border)" }}
+											onClick={function () { that.setOpenRouterModel(m); }}
+										>
+											{m.split("/")[1] || m}
+										</button>
+									);
+								})}
+							</div>
+						) : null}
 
 						{that.state.llmProvider === "custom" ? (
 							<div className="field" style={{ marginBottom: "12px" }}>
@@ -1235,12 +1347,16 @@ var CommitForm = React.createClass({
 				<GitVisualizer
 					commits={that.state.commits}
 					originalCommits={that.state.originalCommits}
+					branches={that.state.branches || []}
+					branchesData={that.state.branchesData || []}
 					activeBranch={that.state.activeBranch || that.state.rev}
 					hasOrigin={that.state.hasOrigin}
 					originUrl={that.state.originUrl}
 					newOriginUrl={that.state.newOriginUrl}
 					isTiedToOrigin={that.state.isTiedToOrigin}
 					onSelectCommit={that.scrollToCommit}
+					onSwitchBranch={that.switchBranchTo}
+					onOpenBranchModal={that.openBranchModal}
 				/>
 
 				{/* 2. Branch Dropdown & Origin Controls Bar */}
@@ -1545,6 +1661,7 @@ function fetchCommits(addr, rev) {
 					hasMore={data.has_more}
 					total={data.total}
 					branches={data.branches}
+					branchesData={data.branches_data || []}
 					activeBranch={data.active_branch}
 					hasOrigin={data.has_origin}
 					originUrl={data.origin_url}
@@ -1567,78 +1684,8 @@ window.refreshCurrentRepo = function () {
 	fetchCommits(addr, rev);
 };
 
-// Setup Voice Recognition & Gesture System (Zero Interface)
-function initZeroAmbientControls() {
-	var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-	var $micBtn = $("#voice-cmd-btn");
-	var $voiceLabel = $("#voice-label");
-
-	if (!SpeechRecognition) {
-		$voiceLabel.text("Voice N/A");
-		$micBtn.attr("title", "Speech Recognition not supported in this browser.");
-		return;
-	}
-
-	var recognition = new SpeechRecognition();
-	recognition.continuous = false;
-	recognition.lang = "en-US";
-	recognition.interimResults = false;
-
-	var isListening = false;
-
-	$micBtn.on("click", function () {
-		if (isListening) {
-			recognition.stop();
-			return;
-		}
-		try {
-			recognition.start();
-			isListening = true;
-			$micBtn.addClass("active");
-			$voiceLabel.text("Listening...");
-		} catch (e) {
-			console.warn("Speech recognition error:", e);
-		}
-	});
-
-	recognition.onresult = function (event) {
-		var transcript = event.results[0][0].transcript.toLowerCase().trim();
-		console.log("Voice transcript:", transcript);
-		$voiceLabel.text("'" + transcript + "'");
-
-		if (transcript.indexOf("make changes") !== -1 || transcript.indexOf("confirm") !== -1 || transcript.indexOf("apply") !== -1) {
-			if (window.triggerMakeChanges) window.triggerMakeChanges();
-		} else if (transcript.indexOf("new branch") !== -1 || transcript.indexOf("create branch") !== -1) {
-			if (window.triggerNewBranch) window.triggerNewBranch();
-		} else if (transcript.indexOf("reload") !== -1 || transcript.indexOf("refresh") !== -1 || transcript.indexOf("inspect") !== -1) {
-			if (window.refreshCurrentRepo) window.refreshCurrentRepo();
-		} else if (transcript.indexOf("ai") !== -1 || transcript.indexOf("engineer") !== -1) {
-			if (window.triggerLLMModal) window.triggerLLMModal();
-		}
-
-		setTimeout(function () {
-			$voiceLabel.text("Voice Ready");
-		}, 2500);
-	};
-
-	recognition.onend = function () {
-		isListening = false;
-		$micBtn.removeClass("active");
-		if ($voiceLabel.text() === "Listening...") {
-			$voiceLabel.text("Voice Ready");
-		}
-	};
-
-	recognition.onerror = function (e) {
-		isListening = false;
-		$micBtn.removeClass("active");
-		$voiceLabel.text("Voice Error");
-		setTimeout(function () {
-			$voiceLabel.text("Voice Ready");
-		}, 2000);
-	};
-
-	// Keyboard Gestures: Cmd+Enter to Make Changes, Escape to close modals
+// Keyboard shortcuts (Cmd+Enter to Make Changes, Escape to close modals)
+function initKeyboardShortcuts() {
 	$(document).on("keydown", function (e) {
 		if ((e.metaKey || e.ctrlKey) && e.keyCode === 13) {
 			e.preventDefault();
@@ -1670,6 +1717,7 @@ function initApiKeysModal() {
 
 	$("#api-keys-popout-btn").on("click", function () {
 		$("#key-openrouter").val(localStorage.getItem("openrouter_api_key") || "");
+		$("#model-openrouter").val(localStorage.getItem("openrouter_model") || "anthropic/claude-3.5-sonnet");
 		$("#key-deepseek").val(localStorage.getItem("deepseek_api_key") || "");
 		$("#key-openai").val(localStorage.getItem("openai_api_key") || "");
 		$("#key-custom").val(localStorage.getItem("custom_api_key") || "");
@@ -1703,6 +1751,7 @@ function initApiKeysModal() {
 
 	$("#api-keys-save-btn").on("click", function () {
 		var or = $("#key-openrouter").val().trim();
+		var om = $("#model-openrouter").val().trim();
 		var ds = $("#key-deepseek").val().trim();
 		var oa = $("#key-openai").val().trim();
 		var cs = $("#key-custom").val().trim();
@@ -1710,6 +1759,7 @@ function initApiKeysModal() {
 		var cm = $("#model-custom").val().trim();
 
 		if (or) localStorage.setItem("openrouter_api_key", or); else localStorage.removeItem("openrouter_api_key");
+		if (om) localStorage.setItem("openrouter_model", om); else localStorage.removeItem("openrouter_model");
 		if (ds) localStorage.setItem("deepseek_api_key", ds); else localStorage.removeItem("deepseek_api_key");
 		if (oa) localStorage.setItem("openai_api_key", oa); else localStorage.removeItem("openai_api_key");
 		if (cs) localStorage.setItem("custom_api_key", cs); else localStorage.removeItem("custom_api_key");
@@ -1722,12 +1772,14 @@ function initApiKeysModal() {
 
 	$("#api-keys-clear-btn").on("click", function () {
 		$("#key-openrouter").val("");
+		$("#model-openrouter").val("");
 		$("#key-deepseek").val("");
 		$("#key-openai").val("");
 		$("#key-custom").val("");
 		$("#url-custom").val("");
 		$("#model-custom").val("");
 		localStorage.removeItem("openrouter_api_key");
+		localStorage.removeItem("openrouter_model");
 		localStorage.removeItem("deepseek_api_key");
 		localStorage.removeItem("openai_api_key");
 		localStorage.removeItem("custom_api_key");
@@ -1774,7 +1826,7 @@ $(document).ready(function () {
 		}
 	});
 
-	initZeroAmbientControls();
+	initKeyboardShortcuts();
 
 	// Proactively load commits on page load using persisted path
 	fetchCommits($("#addr-input").val(), $("#rev-input").val());

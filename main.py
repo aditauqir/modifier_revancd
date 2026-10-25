@@ -90,9 +90,11 @@ def get_commits():
     try:
         branch_info = repo.get_branches()
         data["branches"] = branch_info["branches"]
+        data["branches_data"] = branch_info.get("branches_data", [])
         data["active_branch"] = branch_info["active_branch"]
     except Exception:
         data["branches"] = [rev]
+        data["branches_data"] = [{"name": rev, "sha": "", "is_active": True}]
         data["active_branch"] = rev
 
     try:
@@ -109,8 +111,10 @@ def get_commits():
 
     try:
         commits_generator = repo.get_commits(rev, max_count=limit, skip=skip)
+        branches_data = data.get("branches_data", [])
         for commit in commits_generator:
             date, time_part = make_time_str(commit.authored_date)
+            matching_branches = [b["name"] for b in branches_data if b.get("sha") and (b["sha"] == commit.hexsha or commit.hexsha.startswith(b["sha"]))]
             commit_data = {
                 "sha": commit.hexsha,
                 "message": commit.message.split("\n")[0] if commit.message else "",
@@ -118,6 +122,7 @@ def get_commits():
                 "email": commit.author.email if commit.author else "",
                 "date": date,
                 "time": time_part,
+                "branches": matching_branches,
             }
             data["commits"].append(commit_data)
 
@@ -199,11 +204,28 @@ def create_branch():
         branch_info = repo.get_branches()
         session["address"] = expanded_path
         session["rev"] = branch_info["active_branch"]
+
+        commits = []
+        for c in repo.get_commits(branch_info["active_branch"], max_count=20, skip=0):
+            date, time_part = make_time_str(c.authored_date)
+            matching = [b["name"] for b in branch_info["branches_data"] if b.get("sha") and (b["sha"] == c.hexsha or c.hexsha.startswith(b["sha"]))]
+            commits.append({
+                "sha": c.hexsha,
+                "message": c.message.split("\n")[0] if c.message else "",
+                "author": c.author.name if c.author else "",
+                "email": c.author.email if c.author else "",
+                "date": date,
+                "time": time_part,
+                "branches": matching,
+            })
+
         return jsonify({
             "success": True,
             "branch": created,
             "branches": branch_info["branches"],
+            "branches_data": branch_info["branches_data"],
             "active_branch": branch_info["active_branch"],
+            "commits": commits,
             "message": f"Branch '{created}' created successfully."
         })
     except Exception as e:
@@ -225,10 +247,27 @@ def switch_branch():
         branch_info = repo.get_branches()
         session["address"] = expanded_path
         session["rev"] = switched
+
+        commits = []
+        for c in repo.get_commits(switched, max_count=20, skip=0):
+            date, time_part = make_time_str(c.authored_date)
+            matching = [b["name"] for b in branch_info["branches_data"] if b.get("sha") and (b["sha"] == c.hexsha or c.hexsha.startswith(b["sha"]))]
+            commits.append({
+                "sha": c.hexsha,
+                "message": c.message.split("\n")[0] if c.message else "",
+                "author": c.author.name if c.author else "",
+                "email": c.author.email if c.author else "",
+                "date": date,
+                "time": time_part,
+                "branches": matching,
+            })
+
         return jsonify({
             "success": True,
             "active_branch": switched,
             "branches": branch_info["branches"],
+            "branches_data": branch_info["branches_data"],
+            "commits": commits,
             "message": f"Switched to branch '{switched}'."
         })
     except Exception as e:
@@ -292,6 +331,7 @@ def make_changes():
         commits = []
         for c in repo.get_commits(result.get("target_branch", rev), max_count=20, skip=0):
             date, time_part = make_time_str(c.authored_date)
+            matching = [b["name"] for b in branch_info["branches_data"] if b.get("sha") and (b["sha"] == c.hexsha or c.hexsha.startswith(b["sha"]))]
             commits.append({
                 "sha": c.hexsha,
                 "message": c.message.split("\n")[0] if c.message else "",
@@ -299,6 +339,7 @@ def make_changes():
                 "email": c.author.email if c.author else "",
                 "date": date,
                 "time": time_part,
+                "branches": matching,
             })
 
         session["commits_old"] = commits
@@ -310,6 +351,7 @@ def make_changes():
             "details": result,
             "commits": commits,
             "branches": branch_info["branches"],
+            "branches_data": branch_info["branches_data"],
             "active_branch": branch_info["active_branch"],
             "origin_info": origin_info,
             "has_origin": origin_info["has_origin"],
