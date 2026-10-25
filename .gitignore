@@ -1,3 +1,7 @@
 *.pyc 
 node_modules
 .vscode
+.venv/
+modify_time.sh
+__pycache__/
+

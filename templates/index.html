@@ -1,37 +1,186 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>Git Modifier</title>
-	<link href="//cdn.bootcss.com/semantic-ui/2.1.8/semantic.min.css" rel="stylesheet">
-	<link rel="stylesheet" href="static/css/style.css">
-	<!-- <script src="/static/js/browser.min.js"></script> -->
-	<script src="//cdn.bootcss.com/jquery/3.5.0/jquery.min.js"></script>
-	<script src="//cdn.bootcss.com/semantic-ui/2.1.8/semantic.min.js"></script>
-	<script src="//cdn.bootcss.com/react/0.14.7/react.js"></script>
-	<script src="//cdn.bootcss.com/react/0.14.7/react-dom.js"></script>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Git Repo Modifier — Zero Interface</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jetbrains-mono/1.0.6/css/jetbrains-mono.min.css">
+	<link rel="stylesheet" href="/static/css/style.css">
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.0/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.14.7/react.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.14.7/react-dom.js"></script>
 </head>
 <body>
-	<div class="ui container">
-		<div class="ui center aligned grid">
-			<div class="twelve wide column">
-				<h1 class="ui header">
-					<div class="content">
-						Git Repo Modifier
+	<div class="ui container main-container">
+		<!-- Zero Interface Header -->
+		<header class="zero-header">
+			<div class="zero-brand">
+				<div class="zero-brand-icon">
+					<i class="git icon" style="margin: 0;"></i>
+				</div>
+				<div>
+					<h1 class="zero-title">Git Repo Modifier</h1>
+					<p class="zero-subtitle">Ambient, non-intrusive git history engineering & branch management</p>
+				</div>
+			</div>
+
+			<div class="ambient-controls">
+				<button class="key-popout-btn" id="api-keys-popout-btn" type="button" title="Configure AI & LLM API Keys (OpenRouter / DeepSeek / OpenAI / Custom)">
+					<i class="key icon" style="margin-right: 2px;"></i>
+					<span id="api-keys-label">API Keys</span>
+					<span class="key-status-dot" id="api-keys-dot"></span>
+				</button>
+
+				<button class="voice-mic-btn" id="voice-cmd-btn" type="button" title="Click to trigger voice command (e.g. 'Make changes', 'Reload')">
+					<span class="voice-indicator-dot"></span>
+					<span id="voice-label">Voice Ready</span>
+				</button>
+			</div>
+		</header>
+
+		<!-- API Keys Popout Modal (Progressive Disclosure) -->
+		<div class="custom-modal-overlay" id="api-keys-modal" style="display: none;">
+			<div class="custom-modal-card" style="max-width: 540px; max-height: 90vh; overflow-y: auto;">
+				<div class="custom-modal-header">
+					<h3><i class="key icon" style="color: var(--color-accent);"></i> AI & LLM API Keys</h3>
+					<i class="close icon link" id="api-keys-close-btn"></i>
+				</div>
+				<p style="font-size: 0.8125rem; color: var(--color-text-muted); margin-bottom: 1.25rem;">
+					Configure any AI provider or custom endpoint. Keys are persisted securely in your browser's local storage and used directly for AI Commit synthesis.
+				</p>
+				<form class="ui form" id="api-keys-form" onsubmit="return false;">
+					<!-- OpenRouter -->
+					<div class="field">
+						<label style="display: flex; justify-content: space-between; font-size: 0.8125rem;">
+							<span><strong style="color: var(--color-text-main);">OpenRouter API Key</strong> <span style="font-size: 0.75rem; color: var(--color-green);">(Recommended — access to all models)</span></span>
+							<a href="https://openrouter.ai/keys" target="_blank" style="font-weight: 500; font-size: 0.75rem;">Get OpenRouter Key</a>
+						</label>
+						<div class="ui right action input">
+							<input type="password" id="key-openrouter" placeholder="sk-or-v1-..." autocomplete="off">
+							<button class="ui basic icon button toggle-pwd" type="button" data-target="key-openrouter" title="Toggle visibility">
+								<i class="eye icon"></i>
+							</button>
+						</div>
 					</div>
-				</h1>
-				<div class="ui action left icon input">
-					<i class="home icon"></i>
-					<input type="text" value="" placeholder="Enter the address" name="addr">
-					<input type="text" value="" placeholder="revision" name="rev">
-					<div class="ui blue button" id="modify">Modify</div>
-			    </div>
+
+					<!-- DeepSeek -->
+					<div class="field" style="margin-top: 14px;">
+						<label style="display: flex; justify-content: space-between; font-size: 0.8125rem;">
+							<span>DeepSeek API Key</span>
+							<a href="https://platform.deepseek.com" target="_blank" style="font-weight: 400; font-size: 0.75rem;">Get DeepSeek Key</a>
+						</label>
+						<div class="ui right action input">
+							<input type="password" id="key-deepseek" placeholder="sk-..." autocomplete="off">
+							<button class="ui basic icon button toggle-pwd" type="button" data-target="key-deepseek" title="Toggle visibility">
+								<i class="eye icon"></i>
+							</button>
+						</div>
+					</div>
+
+					<!-- OpenAI -->
+					<div class="field" style="margin-top: 14px;">
+						<label style="display: flex; justify-content: space-between; font-size: 0.8125rem;">
+							<span>OpenAI API Key</span>
+							<a href="https://platform.openai.com/api-keys" target="_blank" style="font-weight: 400; font-size: 0.75rem;">Get OpenAI Key</a>
+						</label>
+						<div class="ui right action input">
+							<input type="password" id="key-openai" placeholder="sk-proj-..." autocomplete="off">
+							<button class="ui basic icon button toggle-pwd" type="button" data-target="key-openai" title="Toggle visibility">
+								<i class="eye icon"></i>
+							</button>
+						</div>
+					</div>
+
+					<!-- Custom / Any API Key & Endpoint -->
+					<div style="margin-top: 16px; padding: 12px; background: var(--color-tertiary); border-radius: var(--radius-base); border: 1px solid var(--color-border);">
+						<div style="font-weight: 600; font-size: 0.8125rem; color: var(--color-text-main); margin-bottom: 8px;">
+							<i class="sliders horizontal icon"></i> Custom / Any Other Provider (Groq, Ollama, LM Studio, etc.)
+						</div>
+						<div class="field" style="margin-bottom: 10px;">
+							<label style="font-size: 0.75rem; color: var(--color-text-muted);">Custom API Key (or leave blank for localhost Ollama)</label>
+							<div class="ui right action input">
+								<input type="password" id="key-custom" placeholder="Bearer token or custom key" autocomplete="off">
+								<button class="ui basic icon button toggle-pwd" type="button" data-target="key-custom" title="Toggle visibility">
+									<i class="eye icon"></i>
+								</button>
+							</div>
+						</div>
+						<div class="two fields" style="margin-bottom: 0;">
+							<div class="field" style="margin-bottom: 0;">
+								<label style="font-size: 0.75rem; color: var(--color-text-muted);">Base URL / Endpoint</label>
+								<input type="text" id="url-custom" placeholder="http://localhost:11434/v1/chat/completions" autocomplete="off">
+							</div>
+							<div class="field" style="margin-bottom: 0;">
+								<label style="font-size: 0.75rem; color: var(--color-text-muted);">Default Model</label>
+								<input type="text" id="model-custom" placeholder="e.g. llama3.3, claude-3-5-sonnet" autocomplete="off">
+							</div>
+						</div>
+					</div>
+
+					<div class="custom-modal-actions" style="margin-top: 1.5rem;">
+						<button type="button" class="zero-btn-secondary" id="api-keys-clear-btn">
+							Clear All Keys
+						</button>
+						<button type="button" class="zero-btn-primary" id="api-keys-save-btn">
+							<i class="check icon"></i> Save Keys
+						</button>
+					</div>
+				</form>
 			</div>
 		</div>
-		<div class="ui center aligned grid" id="commits"></div>
+
+		<!-- Smart Suggestions Context Bar (Progressive Disclosure) -->
+		<div class="smart-suggestions-bar" id="smart-context-bar" style="display: none;">
+			<div class="smart-suggestion-pill">
+				<i class="lightbulb outline icon"></i>
+				<span id="smart-context-text">AI Prediction: Ready to inspect repository.</span>
+			</div>
+			<div style="font-size: 0.75rem; color: #786242;">
+				Press <kbd style="background: #fff; padding: 1px 5px; border-radius: 4px; border: 1px solid #d4c5b0;">⌘ Enter</kbd> to Make Changes
+			</div>
+		</div>
+
+		<!-- Repo Address & Revision Toolbar -->
+		<div class="repo-toolbar">
+			<label class="input-label" for="addr-input">Repository Directory Path</label>
+			<div class="zero-input-group">
+				<div class="ui left icon input" style="flex: 1; min-width: 280px;">
+					<i class="folder open outline icon"></i>
+					<input
+						type="text"
+						value=""
+						placeholder="Enter repository path (e.g. . or /path/to/repo)"
+						name="addr"
+						id="addr-input"
+						autocomplete="off"
+						spellcheck="false"
+					>
+				</div>
+
+				<div class="ui input" style="width: 180px;">
+					<input
+						type="text"
+						value=""
+						placeholder="Revision (HEAD)"
+						name="rev"
+						id="rev-input"
+						autocomplete="off"
+						spellcheck="false"
+					>
+				</div>
+
+				<button class="zero-btn-primary" id="modify" type="button">
+					<i class="search icon"></i> Inspect Repository
+				</button>
+			</div>
+		</div>
+
+		<!-- Main Workspace (Dynamic Visualizer, Branch Dropdown & Commits Form) -->
+		<div class="ui grid" id="commits"></div>
 	</div>
 	
-	<!-- <script type="text/babel" src="static/src/main.js"></script> -->
-	<script type="text/javascript" src="static/build/main.min.js"></script>
+	<script type="text/javascript" src="/static/build/main.js"></script>
 </body>
 </html>
